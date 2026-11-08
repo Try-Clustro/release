@@ -1,0 +1,5 @@
+# Release binaries: never diff, merge or change line endings.
+clustroctl-* binary
+SHA256SUMS text eol=lf
+VERSION text eol=lf
+latest text eol=lf

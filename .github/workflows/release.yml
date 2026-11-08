@@ -1,0 +1,83 @@
+# Every push to main publishes the version named in ./latest:
+#   1. checks <version>/SHA256SUMS against the binaries,
+#   2. creates tag <version> and a GitHub Release with the files in <version>/,
+#   3. moves tag "latest" to this commit and recreates release "latest" with
+#      the same files plus VERSION, which install.sh reads:
+#        https://github.com/Try-Clustro/release/releases/download/latest/VERSION
+#        https://github.com/Try-Clustro/release/releases/download/<version>/clustroctl-<os>-<arch>
+# A push whose version is already released (e.g. a README edit) changes nothing.
+# Prepare releases with v2/release.sh in the Clustro source repo.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: v
+        run: |
+          version=$(tr -d ' \r\n' < latest)
+          [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::latest holds '$version', not a version"; exit 1; }
+          [ -d "$version" ] || { echo "::error::latest says $version but there is no $version/ folder"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$version is already released; nothing to do"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify files
+        if: steps.v.outputs.exists == 'false'
+        working-directory: ${{ steps.v.outputs.version }}
+        run: |
+          sha256sum -c SHA256SUMS
+          [ "$(tr -d ' \r\n' < VERSION)" = "${{ steps.v.outputs.version }}" ] || { echo "::error::VERSION doesn't match latest"; exit 1; }
+          for a in clustroctl-linux-amd64 clustroctl-linux-arm64 clustroctl-darwin-amd64 clustroctl-darwin-arm64; do
+            [ -s "$a" ] || { echo "::error::missing $a (install.sh needs it)"; exit 1; }
+          done
+          [ -s RELEASE_NOTES.md ] || { echo "::error::missing RELEASE_NOTES.md"; exit 1; }
+
+      - name: Publish ${{ steps.v.outputs.version }}
+        if: steps.v.outputs.exists == 'false'
+        run: |
+          v=${{ steps.v.outputs.version }}
+          flags=()
+          if [ "${{ steps.v.outputs.prerelease }}" = true ]; then flags+=(--prerelease); else flags+=(--latest); fi
+          gh release create "$v" "$v"/clustroctl-* "$v"/SHA256SUMS "$v"/VERSION \
+            --title "Clustro $v" --notes-file "$v/RELEASE_NOTES.md" --target "$GITHUB_SHA" "${flags[@]}"
+
+      - name: Move "latest"
+        if: steps.v.outputs.exists == 'false'
+        run: |
+          v=${{ steps.v.outputs.version }}
+          notes="The newest release, currently **[$v](https://github.com/${{ github.repository }}/releases/tag/$v)**. install.sh reads VERSION from here; see $v for the release notes."
+          git tag -f latest "$GITHUB_SHA"
+          git push -f origin refs/tags/latest
+          if gh release view latest >/dev/null 2>&1; then
+            # Replace the files in place, so downloads never see a gap.
+            gh release upload latest "$v"/clustroctl-* "$v"/SHA256SUMS "$v"/VERSION --clobber
+            gh release edit latest --title "Latest: Clustro $v" --notes "$notes" --latest=false
+          else
+            gh release create latest "$v"/clustroctl-* "$v"/SHA256SUMS "$v"/VERSION \
+              --title "Latest: Clustro $v" --target "$GITHUB_SHA" --latest=false --notes "$notes"
+          fi
