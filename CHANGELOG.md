@@ -1,5 +1,9 @@
 # Changelog
 
+## [v2.0.0-alpha.3](https://github.com/Try-Clustro/release/releases/tag/v2.0.0-alpha.3) — 2026-11-12
+
+See [v2.0.0-alpha.3/RELEASE_NOTES.md](v2.0.0-alpha.3/RELEASE_NOTES.md).
+
 ## [v2.0.0-alpha.1](https://github.com/Try-Clustro/release/releases/tag/v2.0.0-alpha.1) — 2026-11-08
 
 First public build of Clustro v2, the rewrite on containerd (ADR-0015). **Alpha: for test clusters only.** It is not compatible with v1 clusters; set up v2 machines fresh.
