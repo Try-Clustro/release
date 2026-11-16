@@ -1,5 +1,9 @@
 # Changelog
 
+## [v2.0.0-alpha.4](https://github.com/Try-Clustro/release/releases/tag/v2.0.0-alpha.4) — 2026-11-16
+
+See [v2.0.0-alpha.4/RELEASE_NOTES.md](v2.0.0-alpha.4/RELEASE_NOTES.md).
+
 ## [v2.0.0-alpha.3](https://github.com/Try-Clustro/release/releases/tag/v2.0.0-alpha.3) — 2026-11-16
 
 - Next relase added v2.0.0-alpha.3
